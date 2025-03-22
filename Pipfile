@@ -15,6 +15,8 @@ scikit-learn = "*"
 tqdm = "*"
 typer = "*"
 "housing_price_neural_net" ={editable = true, path = "."}
+torch = "*"
+seaborn = "*"
 
 [requires]
-python_version = "Implementation of a neural network for real estate price classification based on property attributes."
+python_version = 3.13

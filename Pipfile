@@ -1,0 +1,20 @@
+[packages]
+black = "*"
+flake8 = "*"
+ipython = "*"
+isort = "*"
+jupyterlab = "*"
+loguru = "*"
+matplotlib = "*"
+notebook = "*"
+numpy = "*"
+pandas = "*"
+pip = "*"
+python-dotenv = "*"
+scikit-learn = "*"
+tqdm = "*"
+typer = "*"
+"housing_price_neural_net" ={editable = true, path = "."}
+
+[requires]
+python_version = "Implementation of a neural network for real estate price classification based on property attributes."

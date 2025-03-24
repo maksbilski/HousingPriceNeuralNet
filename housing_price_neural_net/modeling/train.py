@@ -233,9 +233,9 @@ def main(
     logger.info(f"Validation data saved to {val_data_path}")
 
     X_train = torch.FloatTensor(X_train)
-    y_train = torch.LongTensor(y_train)
+    y_train = torch.FloatTensor(y_train)
     X_val = torch.FloatTensor(X_val)
-    y_val = torch.LongTensor(y_val)
+    y_val = torch.FloatTensor(y_val)
 
     train_dataset = TensorDataset(X_train, y_train)
     val_dataset = TensorDataset(X_val, y_val)
@@ -248,7 +248,7 @@ def main(
     class_weights = calculate_adjusted_weights(y_train)
     class_weights = class_weights.to(device)
 
-    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     logger.info("Starting training...")

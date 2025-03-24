@@ -136,11 +136,33 @@ def process_labels(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
     return features, labels
 
 
+def process_labels(df: pd.DataFrame, convert_to_classes: bool = False) -> tuple[pd.DataFrame, pd.Series]:
+    """Convert SalePrice to class labels and separate features from labels.
+    
+    Args:
+        df: DataFrame with SalePrice column
+        convert_to_classes: If True, convert prices to class labels (0: cheap, 1: average, 2: expensive).
+                          If False, keep original prices.
+        
+    Returns:
+        tuple: (features DataFrame, labels Series)
+    """
+    if convert_to_classes:
+        labels = df["SalePrice"].apply(convert_price_to_class)
+    else:
+        labels = df["SalePrice"]
+    
+    features = df.drop(columns=["SalePrice"])
+    
+    return features, labels
+
+
 @app.command()
 def main(
     input_path: Path = RAW_DATA_DIR / "train_data.csv",
     output_path: Path = PROCESSED_DATA_DIR / "train_features.csv",
     use_one_hot: bool = True,
+    convert_to_classes: bool = False,
 ):
     """Generate features from the dataset.
     
@@ -148,14 +170,15 @@ def main(
         input_path: Path to input dataset
         output_path: Path to save processed features with labels
         use_one_hot: Whether to use one-hot encoding for categorical features
+        convert_to_classes: Whether to convert prices to class labels
     """
     logger.info("Loading dataset...")
     df = pd.read_csv(input_path)
     
-    logger.info("Converting prices to classes...")
-    features, labels = process_labels(df)
+    logger.info("Processing labels...")
+    features, labels = process_labels(df, convert_to_classes)
 
-    features["price_class"] = labels
+    features["price"] = labels  # Zmieniona nazwa kolumny na bardziej uniwersalną
     
     logger.info("Scaling continuous features...")
     features = scale_continuous_features(features)

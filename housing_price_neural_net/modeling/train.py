@@ -14,8 +14,9 @@ from housing_price_neural_net.config import MODELS_DIR, PROCESSED_DATA_DIR
 app = typer.Typer()
 
 class HousePriceNet(nn.Module):
-    def __init__(self, input_size: int):
+    def __init__(self, input_size: int, task_type: str = "classification"):
         super().__init__()
+        self.task_type = task_type
         self.network = nn.Sequential(
             nn.Linear(input_size, 128),
             nn.ReLU(),
@@ -26,25 +27,29 @@ class HousePriceNet(nn.Module):
             nn.Linear(64, 32),
             nn.ReLU(),
             nn.Dropout(0.3),
-            nn.Linear(32, 3)  # 3 classes: cheap, average, expensive
+            nn.Linear(32, 3 if task_type == "classification" else 1)
         )
     
     def forward(self, x):
         return self.network(x)
 
 
-def oversample_minority_classes(X: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def oversample_minority_classes(X: np.ndarray, y: np.ndarray, oversampling_ratio: float = 1.0) -> tuple[np.ndarray, np.ndarray]:
     """Oversample minority classes by duplicating samples.
     
     Args:
         X: Feature matrix
         y: Target labels
+        oversampling_ratio: Ratio of minority class samples to majority class samples.
+                          If 1.0, all classes will have the same number of samples.
+                          If 0.5, minority classes will have half the samples of majority class.
         
     Returns:
         tuple: (oversampled_X, oversampled_y)
     """
     unique, counts = np.unique(y, return_counts=True)
     max_count = np.max(counts)
+    target_count = int(max_count * oversampling_ratio)
     
     X_oversampled = []
     y_oversampled = []
@@ -53,19 +58,25 @@ def oversample_minority_classes(X: np.ndarray, y: np.ndarray) -> tuple[np.ndarra
         cls_indices = np.where(y == cls)[0]
         cls_count = len(cls_indices)
         
-        n_duplicates = max_count // cls_count
-        remainder = max_count % cls_count
-        
-        for idx in cls_indices:
-            X_oversampled.append(X[idx])
-            y_oversampled.append(y[idx])
+        if cls_count < target_count:
+            n_duplicates = target_count // cls_count
+            remainder = target_count % cls_count
             
-            for _ in range(n_duplicates - 1):
+            for idx in cls_indices:
                 X_oversampled.append(X[idx])
                 y_oversampled.append(y[idx])
-        
-        if remainder > 0:
-            random_indices = np.random.choice(cls_indices, remainder, replace=False)
+                
+                for _ in range(n_duplicates - 1):
+                    X_oversampled.append(X[idx])
+                    y_oversampled.append(y[idx])
+            
+            if remainder > 0:
+                random_indices = np.random.choice(cls_indices, remainder, replace=False)
+                for idx in random_indices:
+                    X_oversampled.append(X[idx])
+                    y_oversampled.append(y[idx])
+        else:
+            random_indices = np.random.choice(cls_indices, target_count, replace=False)
             for idx in random_indices:
                 X_oversampled.append(X[idx])
                 y_oversampled.append(y[idx])
@@ -73,21 +84,53 @@ def oversample_minority_classes(X: np.ndarray, y: np.ndarray) -> tuple[np.ndarra
     return np.array(X_oversampled), np.array(y_oversampled)
 
 
-def load_data(data_path: Path):
+def oversample_minority_classes_smote(X: np.ndarray, y: np.ndarray, oversampling_ratio: float = 1.0) -> tuple[np.ndarray, np.ndarray]:
+    """Oversample minority classes using SMOTE algorithm.
+    
+    Args:
+        X: Feature matrix
+        y: Target labels
+        oversampling_ratio: Ratio of minority class samples to majority class samples.
+                          If 1.0, all classes will have the same number of samples.
+                          If 0.5, minority classes will have half the samples of majority class.
+        
+    Returns:
+        tuple: (oversampled_X, oversampled_y)
+    """
+    from imblearn.over_sampling import SMOTE
+    
+    smote = SMOTE(random_state=42, sampling_strategy=oversampling_ratio)
+    X_oversampled, y_oversampled = smote.fit_resample(X, y)
+    
+    return X_oversampled, y_oversampled
+
+
+def load_data(data_path: Path, task_type: str = "classification"):
+    """Load and preprocess data.
+    
+    Args:
+        data_path: Path to the data file
+        task_type: Either "classification" or "regression"
+    """
     logger.info("Loading data...")
     df = pd.read_csv(data_path)
     
-    features = df.drop(columns=["price_class"])
-    labels = df["price_class"]
+    features = df.drop(columns=["price"])
+    labels = df["price"]
     
     X = features.values.astype(float)
     y = labels.values
     
-    X_train, X_val, y_train, y_val = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
-    
-    X_train, y_train = oversample_minority_classes(X_train, y_train)
+    if task_type == "classification":
+        # Oversampling tylko dla klasyfikacji
+        X_train, X_val, y_train, y_val = train_test_split(
+            X, y, test_size=0.2, random_state=42, stratify=y
+        )
+        X_train, y_train = oversample_minority_classes(X_train, y_train)
+    else:
+        X_train, X_val, y_train, y_val = train_test_split(
+            X, y, test_size=0.2, random_state=42
+        )
     
     return X_train, X_val, y_train, y_val
 
@@ -100,6 +143,7 @@ def train_model(
     optimizer: torch.optim.Optimizer,
     num_epochs: int,
     device: torch.device,
+    task_type: str = "classification",
 ) -> tuple[list, list]:
     train_losses = []
     val_losses = []
@@ -112,6 +156,8 @@ def train_model(
             
             optimizer.zero_grad()
             outputs = model(batch_X)
+            if task_type == "regression":
+                outputs = outputs.squeeze()
             loss = criterion(outputs, batch_y)
             loss.backward()
             optimizer.step()
@@ -127,6 +173,8 @@ def train_model(
             for batch_X, batch_y in val_loader:
                 batch_X, batch_y = batch_X.to(device), batch_y.to(device)
                 outputs = model(batch_X)
+                if task_type == "regression":
+                    outputs = outputs.squeeze()
                 loss = criterion(outputs, batch_y)
                 val_loss += loss.item()
         
@@ -141,9 +189,10 @@ def train_model(
     return train_losses, val_losses
 
 
-def calculate_class_weights(y: np.ndarray) -> torch.Tensor:
+def calculate_adjusted_weights(y: np.ndarray, scaling_factor=0.75) -> torch.Tensor:
     unique, counts = np.unique(y, return_counts=True)
     weights = 1.0 / counts
+    weights = weights ** scaling_factor
     weights = weights / weights.sum()
     return torch.FloatTensor(weights)
 
@@ -156,8 +205,10 @@ def main(
     batch_size: int = 32,
     num_epochs: int = 10000,
     learning_rate: float = 0.001,
+    oversampling_ratio: float = 1.0,
+    use_smote: bool = False,
 ):
-    """Train a neural network model for house price classification.
+    """Train a neural network model for house price prediction.
     
     Args:
         data_path: Path to CSV file with features and price_class column
@@ -166,6 +217,8 @@ def main(
         batch_size: Batch size for training
         num_epochs: Number of training epochs
         learning_rate: Learning rate for optimization
+        oversampling_ratio: Ratio of minority class samples to majority class samples
+        use_smote: Whether to use SMOTE instead of simple oversampling
     """
     torch.manual_seed(42)
     np.random.seed(42)
@@ -173,7 +226,7 @@ def main(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
     
-    X_train, X_val, y_train, y_val = load_data(data_path)
+    X_train, X_val, y_train, y_val = load_data(data_path, oversampling_ratio, use_smote)
     
     np.savez(val_data_path, X_val=X_val, y_val=y_val)
     logger.info(f"Validation data saved to {val_data_path}")
@@ -191,7 +244,7 @@ def main(
     input_size = X_train.shape[1]
     model = HousePriceNet(input_size).to(device)
     
-    class_weights = calculate_class_weights(y_train)
+    class_weights = calculate_adjusted_weights(y_train)
     class_weights = class_weights.to(device)
     
     criterion = nn.CrossEntropyLoss(weight=class_weights)

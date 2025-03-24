@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "01bae0418130e7dba82abff5e94e38bae30ab0f3baa2a5b96b32824c0ad2edd6"
+            "sha256": "8bba15a11121d73b5039546699e941d35910f24483a0452a2d304a41847da82a"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -596,6 +596,22 @@
             ],
             "markers": "python_version >= '3.6'",
             "version": "==3.10"
+        },
+        "imbalanced-learn": {
+            "hashes": [
+                "sha256:7eb5859f7827cb3babfa5789978c22fe36e56527d9c9768df2d864d98d9b40fe",
+                "sha256:d4a8d6372086982350d6de1c7e5b1ed5ece9e41bf93043b4d0e9ea1c422a6606"
+            ],
+            "markers": "python_version >= '3.10'",
+            "version": "==0.13.0"
+        },
+        "imblearn": {
+            "hashes": [
+                "sha256:d42c2d709d22c00d2b9a91e638d57240a8b79b4014122d92181fcd2549a2f79a",
+                "sha256:d8fbb662919c1b16f438ad91a8256220e53bcf6815c9ad5502c518b798de34f2"
+            ],
+            "index": "pypi",
+            "version": "==0.0"
         },
         "ipykernel": {
             "hashes": [
@@ -2005,6 +2021,14 @@
             ],
             "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'",
             "version": "==1.17.0"
+        },
+        "sklearn-compat": {
+            "hashes": [
+                "sha256:74f8267613249d599aa3a2f2503af32fa51bce0800b1b0b0a57b52354402454e",
+                "sha256:a8aaf8ef711988cbd63f187c5560b5f16b25df663aaa1d2d0e1291341d339f80"
+            ],
+            "markers": "python_version >= '3.8'",
+            "version": "==0.1.3"
         },
         "sniffio": {
             "hashes": [

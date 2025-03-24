@@ -1,11 +1,11 @@
 from pathlib import Path
 
+from loguru import logger
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
 import torch
 import torch.nn as nn
-from loguru import logger
-from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 import typer
 
@@ -122,7 +122,6 @@ def load_data(data_path: Path, task_type: str = "classification"):
     y = labels.values
     
     if task_type == "classification":
-        # Oversampling tylko dla klasyfikacji
         X_train, X_val, y_train, y_val = train_test_split(
             X, y, test_size=0.2, random_state=42, stratify=y
         )
@@ -207,6 +206,7 @@ def main(
     learning_rate: float = 0.001,
     oversampling_ratio: float = 1.0,
     use_smote: bool = False,
+    task_type: str = "classification",
 ):
     """Train a neural network model for house price prediction.
     
@@ -226,7 +226,7 @@ def main(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
     
-    X_train, X_val, y_train, y_val = load_data(data_path, oversampling_ratio, use_smote)
+    X_train, X_val, y_train, y_val = load_data(data_path, task_type)
     
     np.savez(val_data_path, X_val=X_val, y_val=y_val)
     logger.info(f"Validation data saved to {val_data_path}")
@@ -242,7 +242,7 @@ def main(
     val_loader = DataLoader(val_dataset, batch_size=batch_size)
     
     input_size = X_train.shape[1]
-    model = HousePriceNet(input_size).to(device)
+    model = HousePriceNet(input_size, task_type).to(device)
     
     class_weights = calculate_adjusted_weights(y_train)
     class_weights = class_weights.to(device)
@@ -252,7 +252,7 @@ def main(
     
     logger.info("Starting training...")
     train_losses, val_losses = train_model(
-        model, train_loader, val_loader, criterion, optimizer, num_epochs, device
+        model, train_loader, val_loader, criterion, optimizer, num_epochs, device, task_type
     )
     
     torch.save(model.state_dict(), model_path)
